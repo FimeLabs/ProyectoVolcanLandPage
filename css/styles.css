@@ -987,3 +987,15 @@ footer .copy {
 .animate {
     animation: fadeInUp 0.7s ease forwards;
 }
+
+/* Contenedor del Mapa Interactivo */
+.map-container-card {
+    height: 640px;
+}
+
+@media (max-width: 768px) {
+    .map-container-card {
+        height: 520px;
+    }
+}
+

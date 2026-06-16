@@ -63,12 +63,12 @@ function initDoughnutChart() {
  */
 function initCostBarAnimation() {
     const bars = [
-        { id: 'bar1', width: 96 },
-        { id: 'bar2', width: 4.3 },
+        { id: 'bar1', width: 95.4 },
+        { id: 'bar2', width: 4.6 },
         { id: 'bar3', width: 0 },
-        { id: 'bar4', width: 96 },
-        { id: 'bar5', width: 4.3 },
-        { id: 'bar6', width: 2 },
+        { id: 'bar4', width: 95.4 },
+        { id: 'bar5', width: 4.6 },
+        { id: 'bar6', width: 0 },
     ];
 
     function animateBars() {

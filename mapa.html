@@ -205,6 +205,131 @@
   .loading-bar-wrap { width:280px; height:4px; background:rgba(255,255,255,0.08); border-radius:2px; overflow:hidden; }
   .loading-bar { height:100%; background:linear-gradient(90deg, var(--cyan), var(--blue)); border-radius:2px; transition:width 0.3s ease; }
   .loading-status { font-size:10px; color:var(--gray); font-family:'Exo 2', sans-serif; }
+
+  /* Estilos Responsivos para Móviles (Smartphones) */
+  .sidebar-toggle-btn {
+    display: none;
+    position: absolute;
+    bottom: 15px;
+    left: 15px;
+    z-index: 1000;
+    background: rgba(17, 21, 48, 0.95);
+    border: 2px solid var(--blue);
+    color: var(--cyan);
+    padding: 8px 14px;
+    border-radius: 20px;
+    box-shadow: 0 4px 15px rgba(0, 180, 255, 0.4);
+    font-size: 10px;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    align-items: center;
+    gap: 6px;
+    pointer-events: all;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+  .sidebar-toggle-btn:hover {
+    background: var(--blue);
+    color: var(--white);
+    transform: translateY(-2px);
+  }
+  .sidebar-toggle-btn.active {
+    background: var(--red);
+    border-color: var(--red);
+    color: var(--white);
+    box-shadow: 0 4px 15px rgba(255, 76, 106, 0.4);
+  }
+
+  .sidebar-close-btn {
+    display: none;
+    background: rgba(255, 76, 106, 0.15);
+    border: 1px solid var(--red);
+    color: var(--red);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+  }
+  .sidebar-close-btn:hover {
+    background: var(--red);
+    color: var(--white);
+  }
+
+  @media (max-width: 768px) {
+    header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px 12px;
+    }
+    .brand h1 {
+      font-size: 12px;
+    }
+    .brand sub {
+      display: none; /* Ocultar el subtítulo largo para ahorrar espacio vertical en móvil */
+    }
+    .brand-tag {
+      font-size: 8px;
+      padding: 1px 4px;
+    }
+    .header-metrics {
+      width: 100%;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .hm {
+      border-left: none;
+      padding-left: 0;
+      flex: 1;
+      text-align: left;
+    }
+    .hm-val {
+      font-size: 14px;
+    }
+    .hm-lbl {
+      font-size: 7px;
+    }
+
+    .sidebar-toggle-btn {
+      display: flex;
+    }
+    .sidebar-close-btn {
+      display: inline-block;
+    }
+
+    .sidebar {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 280px;
+      max-height: calc(100% - 65px); /* Espacio para que no tape la barra inferior ni el botón */
+      transform: translateX(120%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: all;
+    }
+    .sidebar.open {
+      transform: translateX(0);
+      box-shadow: -5px 0 25px rgba(0, 0, 0, 0.8);
+    }
+
+    .bottom {
+      padding: 6px 12px;
+      font-size: 8px;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    #bottom-coords {
+      display: none; /* No hay hover en pantallas táctiles */
+    }
+    .sim-time {
+      margin-left: 0;
+      width: 100%;
+      text-align: center;
+      margin-top: 2px;
+    }
+  }
 </style>
 </head>
 <body>
@@ -236,10 +361,16 @@
   <div id="map"></div>
   <svg id="pulse-svg"></svg>
 
-  <div class="sidebar">
+  <!-- Botón flotante para ver controles en pantallas móviles -->
+  <button id="sidebar-toggle" class="sidebar-toggle-btn" onclick="toggleSidebar()">📊 Ver Controles</button>
+
+  <div class="sidebar" id="sidebar">
     <!-- Controles -->
     <div class="card">
-      <div class="card-title">Controles de Simulación</div>
+      <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+        <span>Controles de Simulación</span>
+        <button id="sidebar-close-btn" class="sidebar-close-btn" onclick="toggleSidebar()">✕</button>
+      </div>
       <div class="ctrl-row">
         <button id="btn-play" class="active" onclick="togglePlay()">⏸ PAUSAR</button>
         <button onclick="resetSim()">↺ REINICIAR</button>
@@ -819,6 +950,20 @@ init();
 // ═══════════════════════════════════════════════════════════
 // CONTROLES
 // ═══════════════════════════════════════════════════════════
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const toggleBtn = document.getElementById('sidebar-toggle');
+  const isOpen = sidebar.classList.toggle('open');
+  if (toggleBtn) {
+    toggleBtn.innerHTML = isOpen ? '✕ Cerrar Panel' : '📊 Ver Controles';
+    if (isOpen) {
+      toggleBtn.classList.add('active');
+    } else {
+      toggleBtn.classList.remove('active');
+    }
+  }
+}
+
 function togglePlay() {
   playing = !playing;
   const btn = document.getElementById('btn-play');
