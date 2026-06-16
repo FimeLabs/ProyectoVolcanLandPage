@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VOLCAN — Simulación LoRaWAN en tiempo real</title>
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:ital,wght@0,300;0,400;0,600;0,700;0,900;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<!-- Leaflet JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<style>
+  :root {
+    --dark: #0A0E27;
+    --card: rgba(17, 21, 48, 0.85);
+    --card2: #0D1428;
+    --blue: #00B4FF;
+    --cyan: #00FFD1;
+    --gold: #FFD700;
+    --red: #FF4C6A;
+    --green: #39FF14;
+    --purple: #DA70D6;
+    --white: #FFFFFF;
+    --gray: #C8D6DF;
+    --muted: #607D8B;
+    --border: rgba(255, 255, 255, 0.08);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family:'Exo 2', sans-serif;
+    background:var(--dark);
+    color:var(--white);
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+
+  header {
+    flex-shrink:0;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 18px;
+    background:rgba(10, 14, 39, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom:2px solid var(--blue);
+    z-index:600;
+    gap:16px;
+  }
+
+  .brand { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  .brand-tag {
+    font-family:'Orbitron', sans-serif; font-size:9px; font-weight:900;
+    letter-spacing:0.18em; color:var(--cyan); border:1px solid var(--cyan);
+    border-radius:3px; padding:2px 6px; text-transform:uppercase;
+    box-shadow: 0 0 8px rgba(0, 255, 209, 0.2);
+  }
+  .brand h1 { font-family:'Orbitron', sans-serif; font-size:14px; font-weight:700; letter-spacing:0.06em; color: var(--white); }
+  .brand sub { font-size:9px; color:var(--gray); font-weight:300; display:block; margin-top:1px; }
+
+  .header-metrics { display:flex; gap:14px; flex-wrap:wrap; }
+  .hm {
+    text-align:center; font-family:'Orbitron', sans-serif;
+    border-left:1px solid var(--border); padding-left:14px;
+  }
+  .hm:first-child { border-left:none; }
+  .hm-val { font-size:18px; font-weight:900; color:var(--cyan); line-height:1; }
+  .hm-lbl { font-size:8px; color:var(--gray); letter-spacing:0.08em; text-transform:uppercase; margin-top:2px; }
+
+  .map-wrap { flex:1; position:relative; min-height:0; }
+  #map { width:100%; height:100%; }
+  
+  /* Filtro cyberpunk para oscurecer el mapa */
+  .leaflet-tile { filter:brightness(0.3) saturate(0.3) hue-rotate(195deg) invert(0.05); }
+  .leaflet-container { background:#07090f; }
+  .leaflet-control-zoom a { background:rgba(17, 21, 48, 0.95)!important; color:var(--white)!important; border-color:var(--border)!important; }
+  .leaflet-tooltip {
+    background:rgba(10, 14, 39, 0.95)!important; border:1px solid rgba(0, 180, 255, 0.3)!important;
+    color:var(--white)!important; font-family:'IBM Plex Mono', monospace!important;
+    font-size:10px!important; border-radius:5px!important; padding:5px 9px!important;
+    box-shadow:0 4px 16px rgba(0,0,0,0.5)!important;
+    backdrop-filter: blur(5px);
+  }
+  .leaflet-tooltip::before { display:none!important; }
+
+  /* Sidebar */
+  .sidebar {
+    position:absolute; top:10px; right:10px;
+    width:290px; z-index:500;
+    display:flex; flex-direction:column; gap:8px;
+    max-height:calc(100% - 20px); overflow-y:auto;
+    pointer-events:none;
+  }
+  .sidebar::-webkit-scrollbar { width:4px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background:rgba(0, 180, 255, 0.2); border-radius: 2px; }
+
+  .card {
+    background:var(--card); border:1px solid var(--border);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border-radius:10px; padding:12px 14px; pointer-events:all;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  }
+  .card-title {
+    font-family:'Orbitron', sans-serif; font-size:9px; font-weight:700;
+    letter-spacing:0.16em; color:var(--gray); text-transform:uppercase; margin-bottom:10px;
+    border-left: 2.5px solid var(--blue); padding-left: 6px;
+  }
+
+  /* Controles */
+  .ctrl-row { display:flex; gap:6px; flex-wrap:wrap; }
+  button {
+    font-family:'Orbitron', sans-serif; font-size:9px; font-weight: 700;
+    padding:6px 12px; border-radius:4px;
+    border:1px solid var(--border);
+    background:rgba(255,255,255,0.05); color:var(--white);
+    cursor:pointer; transition:all 0.2s; letter-spacing:0.04em;
+  }
+  button:hover { background:rgba(0, 180, 255, 0.15); border-color: var(--blue); }
+  button.active { background:rgba(0, 255, 209, 0.15); border-color:var(--cyan); color:var(--cyan); box-shadow: 0 0 8px rgba(0, 255, 209, 0.25); }
+  select {
+    font-family:'Exo 2', sans-serif; font-size:10px; font-weight: 600;
+    padding:4px 8px; border-radius:4px; border:1px solid var(--border);
+    background:rgba(17, 21, 48, 0.9); color:var(--white); cursor:pointer;
+  }
+
+  /* Lista de rutas */
+  .route-list { display:flex; flex-direction:column; gap:4px; max-height:160px; overflow-y:auto; }
+  .route-list::-webkit-scrollbar { width:3px; }
+  .route-list::-webkit-scrollbar-thumb { background:rgba(255, 255, 255, 0.1); }
+
+  .route-row {
+    display:flex; align-items:center; gap:8px;
+    font-size:11px; padding:5px 6px; border-radius:4px;
+    cursor:pointer; transition:background 0.2s;
+    border-bottom: 1px solid rgba(255,255,255,0.02);
+  }
+  .route-row:hover { background:rgba(0, 180, 255, 0.08); }
+  .route-swatch { width:4px; height:24px; border-radius:2px; flex-shrink:0; }
+  .route-info { flex:1; }
+  .route-name { font-weight:700; color:var(--white); font-size:11px; }
+  .route-detail { font-size:9px; color:var(--gray); font-family:'IBM Plex Mono',monospace; }
+  .route-badge {
+    font-size:8px; padding:2px 5px; border-radius:3px;
+    font-family:'Orbitron', sans-serif; font-weight:900;
+  }
+
+  /* Log */
+  .log { display:flex; flex-direction:column; gap:4px; max-height:130px; overflow-y:auto; }
+  .log::-webkit-scrollbar { width:3px; }
+  .log::-webkit-scrollbar-thumb { background:rgba(255, 255, 255, 0.1); }
+  .log-entry {
+    border-left:2.5px solid; padding:4px 7px;
+    background:rgba(255,255,255,0.02); border-radius:0 4px 4px 0;
+    animation:fadein 0.2s ease;
+  }
+  @keyframes fadein { from{opacity:0;transform:translateX(-3px)} to{opacity:1} }
+  .log-head { display:flex; align-items:center; gap:5px; }
+  .log-name { font-size:10px; font-weight:700; }
+  .log-time { margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:9px; color:var(--muted); }
+  .log-body { font-size:9px; color:var(--gray); margin-top:1px; }
+
+  /* Métricas */
+  .metrics-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+  .metric { background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:5px; padding:7px 8px; }
+  .metric-val { font-family:'Orbitron', sans-serif; font-size:14px; font-weight:700; color:var(--cyan); line-height:1; }
+  .metric-lbl { font-size:8px; color:var(--gray); margin-top:3px; line-height:1.3; }
+
+  /* GW status */
+  .gw-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px; }
+  .gw-item {
+    background:rgba(255,255,255,0.02); border:1px solid var(--border);
+    border-radius:4px; padding:5px 6px; text-align:center;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .gw-id { font-size:9px; font-weight:600; color: var(--gray); }
+  .gw-pkts { font-size:13px; font-weight:600; color:var(--cyan); line-height:1.1; margin-top:2px; }
+  .gw-lbl { font-size:8px; color:var(--muted); }
+
+  /* Bottom */
+  .bottom {
+    flex-shrink:0; display:flex; align-items:center; gap:16px;
+    padding:8px 18px; background:rgba(10, 14, 39, 0.95); border-top:1px solid var(--border);
+    font-family:'Orbitron', sans-serif; font-size:9px; color:var(--gray);
+  }
+  .bottom span { color:var(--cyan); }
+  .sim-time { margin-left:auto; font-size:10px; color:var(--white); font-weight: 700; }
+
+  /* SVG overlay */
+  #pulse-svg {
+    position:absolute; top:0; left:0; width:100%; height:100%;
+    pointer-events:none; z-index:400;
+  }
+
+  /* Loading */
+  #loading {
+    position:fixed; inset:0; background:var(--dark);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    z-index:9999; gap:16px;
+  }
+  .loading-title { font-family:'Orbitron', sans-serif; font-size:14px; font-weight: 900; color:var(--cyan); letter-spacing:0.12em; }
+  .loading-bar-wrap { width:280px; height:4px; background:rgba(255,255,255,0.08); border-radius:2px; overflow:hidden; }
+  .loading-bar { height:100%; background:linear-gradient(90deg, var(--cyan), var(--blue)); border-radius:2px; transition:width 0.3s ease; }
+  .loading-status { font-size:10px; color:var(--gray); font-family:'Exo 2', sans-serif; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="loading-title">VOLCAN · MAPA EN TIEMPO REAL</div>
+  <div class="loading-bar-wrap"><div class="loading-bar" id="lbar" style="width:0%"></div></div>
+  <div class="loading-status" id="lstatus">Conectando con servidor OSRM de rutas...</div>
+</div>
+
+<header>
+  <div class="brand">
+    <div class="brand-tag">Simulación activa</div>
+    <div>
+      <h1>VOLCAN — MONITOREO DE RED</h1>
+      <sub>Rutas de Colima y Villa de Álvarez · Coordenadas GPS · 9 Gateways UdC (US915 MHz)</sub>
+    </div>
+  </div>
+  <div class="header-metrics">
+    <div class="hm"><div class="hm-val" id="hm-buses">0</div><div class="hm-lbl">Buses activos</div></div>
+    <div class="hm"><div class="hm-val" id="hm-pkts" style="color:var(--cyan)">0</div><div class="hm-lbl">Paquetes TX</div></div>
+    <div class="hm"><div class="hm-val" id="hm-lost" style="color:var(--red)">0</div><div class="hm-lbl">Paquetes Perdidos</div></div>
+    <div class="hm"><div class="hm-val" id="hm-pdr" style="color:var(--green)">—</div><div class="hm-lbl">Tasa de Entrega</div></div>
+    <div class="hm"><div class="hm-val" id="hm-simtime">00:00</div><div class="hm-lbl">Tiempo Transcurrido</div></div>
+  </div>
+</header>
+
+<div class="map-wrap">
+  <div id="map"></div>
+  <svg id="pulse-svg"></svg>
+
+  <div class="sidebar">
+    <!-- Controles -->
+    <div class="card">
+      <div class="card-title">Controles de Simulación</div>
+      <div class="ctrl-row">
+        <button id="btn-play" class="active" onclick="togglePlay()">⏸ PAUSAR</button>
+        <button onclick="resetSim()">↺ REINICIAR</button>
+        <select onchange="setSpeed(this.value)">
+          <option value="1">×1 tiempo real</option>
+          <option value="5" selected>×5 rápido</option>
+          <option value="15">×15 veloz</option>
+          <option value="30">×30 máximo</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Rutas -->
+    <div class="card">
+      <div class="card-title">Rutas de Transporte (<span id="route-count">0</span>)</div>
+      <div class="route-list" id="route-list"></div>
+    </div>
+
+    <!-- GW stats -->
+    <div class="card">
+      <div class="card-title">Recepción por Gateway</div>
+      <div class="gw-grid" id="gw-grid"></div>
+    </div>
+
+    <!-- Métricas LoRa -->
+    <div class="card">
+      <div class="card-title">Especificaciones Red (SF8)</div>
+      <div class="metrics-grid">
+        <div class="metric"><div class="metric-val">60 ms</div><div class="metric-lbl">ToA por paquete</div></div>
+        <div class="metric"><div class="metric-val">30 s</div><div class="metric-lbl">Intervalo TX</div></div>
+        <div class="metric"><div class="metric-val" id="met-occ">—</div><div class="metric-lbl">Uso de Canal</div></div>
+        <div class="metric"><div class="metric-val" id="met-dist">—</div><div class="metric-lbl">Distancia Sim.</div></div>
+      </div>
+      <div style="margin-top:8px;font-size:10px;color:var(--gray);line-height:1.4">
+        Un bus a <span style="color:var(--cyan)">35 km/h</span> avanza
+        <span style="color:var(--cyan)">~291 m</span> cada transmisión.<br>
+        La precisión de alerta es de ±10 metros.
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="card">
+      <div class="card-title">Historial de Paquetes</div>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+</div>
+
+<div class="bottom">
+  <span>LoRaWAN 915 MHz</span> &nbsp;|&nbsp; 9 Gateways Activos &nbsp;|&nbsp; Sin Costo de Datos
+  <span id="bottom-coords" style="color:var(--muted)">Hover sobre el mapa para coordenadas</span>
+  <div class="sim-time" id="sim-clock">Reloj de simulación: 00:00:00</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// MAPA
+// ═══════════════════════════════════════════════════════════
+const map = L.map('map', { center:[19.248,-103.726], zoom:13, zoomControl:true, attributionControl:false });
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(map);
+map.on('mousemove', e => {
+  document.getElementById('bottom-coords').textContent =
+    `lat ${e.latlng.lat.toFixed(5)}  lng ${e.latlng.lng.toFixed(5)}`;
+});
+
+// ═══════════════════════════════════════════════════════════
+// GATEWAYS — 9 puntos en ubicaciones reales de Colima
+// ═══════════════════════════════════════════════════════════
+const GWS = [
+  { id:'GW-1', name:'Cerro La Albarrada',        lat:19.2720, lng:-103.7210 },
+  { id:'GW-2', name:'Tec de Colima',             lat:19.2480, lng:-103.7050 },
+  { id:'GW-3', name:'Palacio de Gobierno',       lat:19.2435, lng:-103.7260 },
+  { id:'GW-4', name:'Central Camionera',         lat:19.2330, lng:-103.7430 },
+  { id:'GW-5', name:'Hospital IMSS',             lat:19.2380, lng:-103.7170 },
+  { id:'GW-6', name:'Plaza Colima',              lat:19.2280, lng:-103.7130 },
+  { id:'GW-7', name:'VdA — Paseo M. Madrid',    lat:19.2600, lng:-103.7380 },
+  { id:'GW-8', name:'VdA — Av. Las Torres',     lat:19.2460, lng:-103.7480 },
+  { id:'GW-9', name:'Periférico Sur',            lat:19.2200, lng:-103.7290 },
+];
+const GW_RADIUS = 2000; // metros
+const gwPkts = Object.fromEntries(GWS.map(g => [g.id, 0]));
+
+// Cobertura visual
+GWS.forEach((gw, i) => {
+  const h = (i * 37) % 360;
+  const c = `hsl(${h},75%,60%)`;
+  L.circle([gw.lat, gw.lng], {
+    radius:GW_RADIUS, color:c, weight:1.5, opacity:0.35,
+    fillColor:c, fillOpacity:0.04,
+  }).addTo(map).bindTooltip(`${gw.id} · ${gw.name}`, { sticky:true });
+
+  const icon = L.divIcon({
+    className:'',
+    html:`<div style="width:28px;height:28px;border-radius:50%;background:rgba(10,14,39,0.95);border:2px solid ${c};display:flex;align-items:center;justify-content:center;font-family:'Orbitron',sans-serif;font-size:7px;font-weight:900;color:${c};box-shadow:0 0 10px ${c}55">${gw.id.replace('GW-','G')}</div>`,
+    iconSize:[28,28], iconAnchor:[14,14],
+  });
+  L.marker([gw.lat, gw.lng], { icon }).addTo(map)
+    .bindTooltip(`<b>${gw.id}</b> · ${gw.name}`, { direction:'top', offset:[0,-18] });
+});
+
+// GW grid en sidebar
+const gwGrid = document.getElementById('gw-grid');
+GWS.forEach(gw => {
+  const d = document.createElement('div');
+  d.className = 'gw-item'; d.id = `gw-item-${gw.id}`;
+  d.innerHTML = `<div class="gw-id">${gw.id}</div><div class="gw-pkts" id="gw-pkts-${gw.id}">0</div><div class="gw-lbl">paquetes</div>`;
+  gwGrid.appendChild(d);
+});
+
+// ═══════════════════════════════════════════════════════════
+// RUTAS — números reales de TransCol Colima (SEMOV)
+// Waypoints clave sobre calles reales; OSRM los conecta sobre la red vial
+// ═══════════════════════════════════════════════════════════
+const ROUTE_DEFS = [
+  {
+    id:'R1', label:'Ruta 1', busCount:4,
+    color:'#FF4C6A', speedKmh:32,
+    waypoints:[
+      [19.2720,-103.7380],[19.2640,-103.7280],[19.2560,-103.7200],
+      [19.2480,-103.7130],[19.2420,-103.7080],[19.2370,-103.7130],
+      [19.2320,-103.7220],[19.2290,-103.7330],[19.2330,-103.7430],
+      [19.2430,-103.7470],[19.2560,-103.7440],[19.2680,-103.7420],[19.2720,-103.7380],
+    ],
+  },
+  {
+    id:'R2', label:'Ruta 2', busCount:3,
+    color:'#ff7b92', speedKmh:30,
+    waypoints:[
+      [19.2650,-103.7300],[19.2580,-103.7230],[19.2500,-103.7160],
+      [19.2440,-103.7110],[19.2380,-103.7130],[19.2330,-103.7200],
+      [19.2300,-103.7320],[19.2320,-103.7420],[19.2410,-103.7460],[19.2520,-103.7430],[19.2650,-103.7300],
+    ],
+  },
+  {
+    id:'R3', label:'Ruta 3', busCount:3,
+    color:'#FF8C00', speedKmh:28,
+    waypoints:[
+      [19.2600,-103.7390],[19.2540,-103.7330],[19.2470,-103.7270],
+      [19.2410,-103.7210],[19.2360,-103.7170],[19.2310,-103.7240],
+      [19.2280,-103.7340],[19.2310,-103.7440],[19.2400,-103.7490],[19.2530,-103.7460],[19.2600,-103.7390],
+    ],
+  },
+  {
+    id:'R4', label:'Ruta 4', busCount:2,
+    color:'#FFD700', speedKmh:35,
+    waypoints:[
+      [19.2480,-103.7050],[19.2430,-103.7050],[19.2370,-103.7060],
+      [19.2310,-103.7080],[19.2260,-103.7110],[19.2220,-103.7150],
+      [19.2200,-103.7220],[19.2220,-103.7320],[19.2280,-103.7420],[19.2380,-103.7460],[19.2480,-103.7050],
+    ],
+  },
+  {
+    id:'R5', label:'Ruta 5', busCount:3,
+    color:'#00B4FF', speedKmh:33,
+    waypoints:[
+      [19.2720,-103.7210],[19.2650,-103.7180],[19.2580,-103.7150],
+      [19.2510,-103.7120],[19.2440,-103.7110],[19.2370,-103.7130],
+      [19.2300,-103.1180],[19.2250,-103.7250],[19.2240,-103.7350],
+      [19.2290,-103.7440],[19.2400,-103.7460],[19.2540,-103.7380],[19.2650,-103.7290],[19.2720,-103.7210],
+    ],
+  },
+  {
+    id:'R7', label:'Ruta 7', busCount:4,
+    color:'#FF8C00', speedKmh:30,
+    waypoints:[
+      [19.2330,-103.7430],[19.2290,-103.7360],[19.2260,-103.7280],
+      [19.2230,-103.7200],[19.2200,-103.7130],[19.2170,-103.7060],
+      [19.2150,-103.7150],[19.2160,-103.7260],[19.2200,-103.7380],
+      [19.2260,-103.7450],[19.2330,-103.7430],
+    ],
+  },
+  {
+    id:'R9', label:'Ruta 9', busCount:2,
+    color:'#39FF14', speedKmh:31,
+    waypoints:[
+      [19.2480,-103.7050],[19.2450,-103.7100],[19.2420,-103.7160],
+      [19.2390,-103.7220],[19.2360,-103.7280],[19.2330,-103.7350],
+      [19.2310,-103.7430],[19.2390,-103.7470],[19.2480,-103.7050],
+    ],
+  },
+  {
+    id:'R10', label:'Ruta 10', busCount:3,
+    color:'#00FFD1', speedKmh:34,
+    waypoints:[
+      [19.2480,-103.7050],[19.2420,-103.7055],[19.2360,-103.7065],
+      [19.2300,-103.7080],[19.2250,-103.7100],[19.2210,-103.7130],
+      [19.2190,-103.7210],[19.2200,-103.7310],[19.2250,-103.7400],
+      [19.2350,-103.7460],[19.2460,-103.7450],[19.2480,-103.7050],
+    ],
+  },
+  {
+    id:'R11', label:'Ruta 11', busCount:2,
+    color:'#00B4FF', speedKmh:29,
+    waypoints:[
+      [19.2600,-103.7200],[19.2540,-103.7160],[19.2470,-103.7130],
+      [19.2400,-103.7120],[19.2340,-103.7150],[19.2280,-103.7200],
+      [19.2240,-103.7280],[19.2260,-103.7380],[19.2350,-103.7440],
+      [19.2460,-103.7430],[19.2560,-103.7370],[19.2600,-103.7200],
+    ],
+  },
+  {
+    id:'R13', label:'Ruta 13', busCount:2,
+    color:'#bd79f9', speedKmh:27,
+    waypoints:[
+      [19.2430,-103.7460],[19.2370,-103.7400],[19.2320,-103.7330],
+      [19.2290,-103.7260],[19.2270,-103.7180],[19.2260,-103.7100],
+      [19.2310,-103.7060],[19.2380,-103.7070],[19.2440,-103.7110],[19.2430,-103.7460],
+    ],
+  },
+  {
+    id:'R14', label:'Ruta 14', busCount:3,
+    color:'#DA70D6', speedKmh:32,
+    waypoints:[
+      [19.2480,-103.7050],[19.2430,-103.7065],[19.2370,-103.7080],
+      [19.2310,-103.7090],[19.2260,-103.7120],[19.2220,-103.7180],
+      [19.2200,-103.7260],[19.2230,-103.7360],[19.2300,-103.7440],
+      [19.2400,-103.7470],[19.2480,-103.7050],
+    ],
+  },
+  {
+    id:'R17', label:'Ruta 17', busCount:2,
+    color:'#FF4C6A', speedKmh:33,
+    waypoints:[
+      [19.2720,-103.7380],[19.2660,-103.7310],[19.2590,-103.7240],
+      [19.2510,-103.7180],[19.2440,-103.7140],[19.2370,-103.7170],
+      [19.2310,-103.7240],[19.2280,-103.7330],[19.2310,-103.7420],
+      [19.2400,-103.7460],[19.2510,-103.7430],[19.2620,-103.7390],[19.2720,-103.7380],
+    ],
+  },
+  {
+    id:'R20', label:'Ruta 20', busCount:4,
+    color:'#DA70D6', speedKmh:35,
+    waypoints:[
+      [19.2720,-103.7380],[19.2670,-103.7290],[19.2600,-103.7210],
+      [19.2530,-103.7150],[19.2460,-103.7110],[19.2390,-103.7110],
+      [19.2330,-103.7150],[19.2280,-103.7220],[19.2260,-103.7320],
+      [19.2290,-103.7430],[19.2380,-103.7470],[19.2510,-103.7450],
+      [19.2620,-103.7400],[19.2720,-103.7380],
+    ],
+  },
+  {
+    id:'R29', label:'Ruta 29', busCount:2,
+    color:'#FF4C6A', speedKmh:38,
+    waypoints:[
+      [19.2200,-103.7050],[19.2200,-103.7130],[19.2200,-103.7220],
+      [19.2200,-103.7310],[19.2200,-103.7400],[19.2200,-103.7490],
+    ],
+  },
+];
+
+// ═══════════════════════════════════════════════════════════
+// OSRM — traza rutas sobre calles reales
+// ═══════════════════════════════════════════════════════════
+async function getRoute(waypoints) {
+  const coords = waypoints.map(([lat,lng]) => `${lng},${lat}`).join(';');
+  try {
+    const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
+    const d = await r.json();
+    if (d.routes && d.routes[0])
+      return d.routes[0].geometry.coordinates.map(([lng,lat]) => [lat,lng]);
+  } catch(e) {}
+  return waypoints;
+}
+
+// ═══════════════════════════════════════════════════════════
+// SIMULACIÓN
+// ═══════════════════════════════════════════════════════════
+let playing = false, speed = 5;
+let simT = 0;         // segundos simulados
+let totalPkts = 0, lostPkts = 0;
+let routeData = [];   // coordenadas reales por ruta
+let buses = [];
+let busMarkers = {};
+let logEntries = [];
+const TX_INTERVAL = 30;  // segundos LoRaWAN entre transmisiones
+const TOA_MS = 60;        // ms en el aire (SF8, 12 bytes, US915)
+let totalDistKm = 0;
+
+// Pulsos animados en SVG
+let pulses = [];
+
+function nearestGW(lat, lng) {
+  let best = 0, bestD = Infinity;
+  GWS.forEach((g, i) => {
+    const d = Math.hypot(g.lat - lat, g.lng - lng);
+    if (d < bestD) { bestD = d; best = i; }
+  });
+  return { idx: best, distM: bestD * 111000 };
+}
+
+// ¿Está el punto dentro del radio del GW más cercano?
+function inCoverage(lat, lng) {
+  const { distM } = nearestGW(lat, lng);
+  return distM <= GW_RADIUS;
+}
+
+// Pérdida de paquetes: base ~5%, sube con carga del canal
+function pdrLoss() {
+  const load = (totalPkts * TOA_MS / 1000) / Math.max(simT, 1);
+  const baseP = 0.05 + Math.min(load * 0.15, 0.20);
+  return Math.random() < baseP;
+}
+
+function busLatLng(bus) {
+  const coords = routeData[bus.routeIdx];
+  if (!coords || coords.length < 2) return [19.248, -103.726];
+  const n = coords.length - 1;
+  const seg = Math.min(Math.floor(bus.progress * n), n - 1);
+  const frac = (bus.progress * n) - seg;
+  const a = coords[seg], b = coords[Math.min(seg + 1, n)];
+  return [a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac];
+}
+
+function simTimeStr(s) {
+  const h = Math.floor(s / 3600) % 24;
+  const m = Math.floor(s / 60) % 60;
+  const ss = Math.floor(s) % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+}
+
+function addLog(entry) {
+  logEntries.unshift(entry);
+  if (logEntries.length > 10) logEntries.pop();
+  const el = document.getElementById('log');
+  el.innerHTML = logEntries.map(e => `
+    <div class="log-entry" style="border-color:${e.color}">
+      <div class="log-head">
+        <span class="log-name" style="color:${e.color}">${e.name}</span>
+        <span class="log-time">${e.time}</span>
+      </div>
+      <div class="log-body">${e.body}</div>
+    </div>
+  `).join('');
+}
+
+function drawPulses() {
+  const svg = document.getElementById('pulse-svg');
+  svg.innerHTML = '';
+  pulses.forEach(p => {
+    const from = map.latLngToContainerPoint([p.fromLat, p.fromLng]);
+    const to   = map.latLngToContainerPoint([p.toLat,   p.toLng]);
+    const fade = p.progress < 0.1 ? p.progress / 0.1 : p.progress > 0.9 ? (1 - p.progress) / 0.1 : 1;
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',from.x); line.setAttribute('y1',from.y);
+    line.setAttribute('x2',to.x);   line.setAttribute('y2',to.y);
+    line.setAttribute('stroke', p.color);
+    line.setAttribute('stroke-width','1.5');
+    line.setAttribute('stroke-opacity', 0.12 * fade);
+    line.setAttribute('stroke-dasharray','3 8');
+    svg.appendChild(line);
+
+    const cx = from.x + (to.x - from.x) * p.progress;
+    const cy = from.y + (to.y - from.y) * p.progress;
+
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',cx); c.setAttribute('cy',cy);
+    c.setAttribute('r', p.lost ? 3 : 5);
+    c.setAttribute('fill', p.lost ? '#FF4C6A' : p.color);
+    c.setAttribute('opacity', fade * 0.9);
+    svg.appendChild(c);
+
+    if (!p.lost) {
+      const h = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      h.setAttribute('cx',cx); h.setAttribute('cy',cy);
+      h.setAttribute('r',9);
+      h.setAttribute('fill','none');
+      h.setAttribute('stroke', p.color);
+      h.setAttribute('stroke-width','1');
+      h.setAttribute('opacity', fade * 0.3);
+      svg.appendChild(h);
+    }
+  });
+}
+
+function updateHeader() {
+  document.getElementById('hm-buses').textContent = buses.length;
+  document.getElementById('hm-pkts').textContent = totalPkts;
+  document.getElementById('hm-lost').textContent = lostPkts;
+  const pdr = totalPkts > 0 ? ((totalPkts - lostPkts) / totalPkts * 100).toFixed(1) + '%' : '—';
+  document.getElementById('hm-pdr').textContent = pdr;
+  document.getElementById('hm-simtime').textContent = simTimeStr(simT).slice(0,5);
+  document.getElementById('sim-clock').textContent = 'Reloj de simulación: ' + simTimeStr(simT);
+
+  // Ocupación del canal (simplificada)
+  const nBuses = buses.length;
+  const occMs = (nBuses * TOA_MS) / (TX_INTERVAL * 1000) * 100;
+  document.getElementById('met-occ').textContent = occMs.toFixed(1) + '%';
+  document.getElementById('met-dist').textContent = totalDistKm.toFixed(1) + ' km';
+
+  // GW pkts
+  GWS.forEach(gw => {
+    const el = document.getElementById(`gw-pkts-${gw.id}`);
+    if (el) el.textContent = gwPkts[gw.id];
+  });
+}
+
+function updateRouteList() {
+  const el = document.getElementById('route-list');
+  el.innerHTML = ROUTE_DEFS.map((r, i) => {
+    const busesDef = buses.filter(b => b.routeIdx === i);
+    const ll = busesDef.length > 0 ? busLatLng(busesDef[0]) : null;
+    const gwId = ll ? GWS[nearestGW(ll[0], ll[1]).idx].id : '—';
+    return `
+      <div class="route-row" onclick="flyToRoute(${i})">
+        <div class="route-swatch" style="background:${r.color}"></div>
+        <div class="route-info">
+          <div class="route-name">${r.label}</div>
+          <div class="route-detail">${r.busCount} unidades · ${r.speedKmh} km/h · ${gwId}</div>
+        </div>
+        <div class="route-badge" style="background:${r.color}18;color:${r.color}">TX</div>
+      </div>
+    `;
+  }).join('');
+  document.getElementById('route-count').textContent = ROUTE_DEFS.length;
+}
+
+function flyToRoute(idx) {
+  const busList = buses.filter(b => b.routeIdx === idx);
+  if (busList.length > 0) {
+    const ll = busLatLng(busList[0]);
+    map.flyTo(ll, 14);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// LOOP
+// ═══════════════════════════════════════════════════════════
+let lastTs = null;
+
+function loop(ts) {
+  if (!lastTs) lastTs = ts;
+  const wallDt = Math.min((ts - lastTs) / 1000, 0.05);
+  lastTs = ts;
+
+  if (playing) {
+    const dt = wallDt * speed;
+    simT += dt;
+
+    buses.forEach(bus => {
+      const def = ROUTE_DEFS[bus.routeIdx];
+      const coords = routeData[bus.routeIdx];
+      if (!coords || coords.length < 2) return;
+
+      // Velocidad real: progreso en función de km/h y longitud real de la ruta
+      const totalLenKm = bus.routeLenKm || 8;
+      const progressPerSec = (def.speedKmh / 3600) / totalLenKm;
+      bus.progress += progressPerSec * dt;
+      if (bus.progress >= 1) bus.progress -= 1;
+
+      totalDistKm += (def.speedKmh / 3600) * dt / 1000;
+
+      const ll = busLatLng(bus);
+      busMarkers[bus.uid].setLatLng(ll);
+
+      // TX periódico
+      bus.txTimer += dt;
+      if (bus.txTimer >= TX_INTERVAL) {
+        bus.txTimer -= TX_INTERVAL;
+
+        const inCov = inCoverage(ll[0], ll[1]);
+        const lost  = !inCov || pdrLoss();
+        totalPkts++;
+        if (lost) lostPkts++;
+
+        const { idx: gwIdx } = nearestGW(ll[0], ll[1]);
+        const gw = GWS[gwIdx];
+
+        if (!lost) {
+          gwPkts[gw.id]++;
+          pulses.push({
+            fromLat: ll[0], fromLng: ll[1],
+            toLat: gw.lat, toLng: gw.lng,
+            color: def.color, progress: 0, lost: false,
+          });
+        } else {
+          pulses.push({
+            fromLat: ll[0], fromLng: ll[1],
+            toLat: ll[0] + 0.005, toLng: ll[1] + 0.005,
+            color: '#FF4C6A', progress: 0, lost: true,
+          });
+        }
+
+        addLog({
+          name: def.label,
+          color: def.color,
+          time: simTimeStr(simT).slice(0,5),
+          body: lost
+            ? `✗ Paquete perdido — ${inCov ? 'colisión/ruido' : 'sin cobertura'}`
+            : `✓ → ${gw.id} · ${gw.name}`,
+        });
+      }
+    });
+
+    pulses.forEach(p => { p.progress += wallDt * 1.2; });
+    pulses = pulses.filter(p => p.progress < 1);
+
+    updateHeader();
+    updateRouteList();
+  }
+
+  drawPulses();
+  requestAnimationFrame(loop);
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+async function init() {
+  const lbar = document.getElementById('lbar');
+  const lstatus = document.getElementById('lstatus');
+  const total = ROUTE_DEFS.length;
+
+  for (let i = 0; i < total; i++) {
+    const def = ROUTE_DEFS[i];
+    lstatus.textContent = `Trazando ${def.label} sobre calles reales...`;
+    lbar.style.width = `${Math.round((i / total) * 90)}%`;
+
+    const coords = await getRoute(def.waypoints);
+    routeData.push(coords);
+
+    // Calcular longitud aproximada de la ruta
+    let lenM = 0;
+    for (let j = 1; j < coords.length; j++) {
+      lenM += map.distance(coords[j-1], coords[j]);
+    }
+    const lenKm = lenM / 1000;
+
+    // Dibujar ruta
+    L.polyline(coords, { color:def.color, weight:2.5, opacity:0.65, lineJoin:'round' })
+      .addTo(map)
+      .bindTooltip(`${def.label} · ${def.speedKmh} km/h · ${lenKm.toFixed(1)} km`, { sticky:true });
+
+    // Crear camiones
+    for (let b = 0; b < def.busCount; b++) {
+      const uid = `${def.id}_${b}`;
+      const progress = b / def.busCount;
+      const coordIdx = Math.min(Math.floor(progress * coords.length), coords.length - 1);
+
+      const busIcon = L.divIcon({
+        className:'',
+        html:`<div style="
+          width:24px;height:24px;border-radius:50%;
+          background:${def.color};border:2px solid rgba(7,9,15,0.8);
+          display:flex;align-items:center;justify-content:center;
+          font-family:'Orbitron',sans-serif;font-size:7px;font-weight:700;
+          color:rgba(7,9,15,0.9);
+          box-shadow:0 2px 8px rgba(0,0,0,0.7);
+        ">${def.id.replace('R','')}</div>`,
+        iconSize:[24,24], iconAnchor:[12,12],
+      });
+
+      busMarkers[uid] = L.marker(coords[coordIdx], { icon:busIcon, zIndexOffset:1000 })
+        .addTo(map)
+        .bindTooltip(`${def.label} · unidad ${b+1} · ${def.speedKmh} km/h`, { direction:'top', offset:[0,-16] });
+
+      buses.push({
+        uid, routeIdx: i, busNum: b + 1,
+        progress,
+        routeLenKm: lenKm,
+        txTimer: Math.random() * TX_INTERVAL,
+      });
+    }
+  }
+
+  setTimeout(() => {
+    lbar.style.width = '100%';
+    lstatus.textContent = `${buses.length} camiones en ${total} rutas — sistema listo`;
+    document.getElementById('loading').style.display = 'none';
+    playing = true;
+    requestAnimationFrame(loop);
+  }, 700);
+}
+
+init();
+
+// ═══════════════════════════════════════════════════════════
+// CONTROLES
+// ═══════════════════════════════════════════════════════════
+function togglePlay() {
+  playing = !playing;
+  const btn = document.getElementById('btn-play');
+  btn.textContent = playing ? '⏸ PAUSAR' : '▶ REANUDAR';
+  btn.className   = playing ? 'active' : '';
+}
+
+function resetSim() {
+  simT = 0; totalPkts = 0; lostPkts = 0; totalDistKm = 0;
+  pulses = []; logEntries = [];
+  GWS.forEach(gw => gwPkts[gw.id] = 0);
+  buses.forEach((b, i) => {
+    b.progress = (b.busNum - 1) / ROUTE_DEFS[b.routeIdx].busCount;
+    b.txTimer = Math.random() * TX_INTERVAL;
+  });
+  document.getElementById('log').innerHTML = '';
+  updateHeader();
+}
+
+function setSpeed(v) { speed = parseFloat(v); }
+
+map.on('move zoom', drawPulses);
+</script>
+</body>
+</html>
