@@ -672,6 +672,56 @@
         margin-top: 2px;
       }
     }
+
+    /* Switch toggle styles */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 32px;
+      height: 18px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(255, 255, 255, 0.1);
+      transition: .3s;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 10px;
+      width: 10px;
+      left: 3px;
+      bottom: 3px;
+      background-color: var(--white);
+      transition: .3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: rgba(0, 255, 209, 0.2);
+      border-color: var(--cyan);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(14px);
+      background-color: var(--cyan);
+      box-shadow: 0 0 6px var(--cyan);
+    }
   </style>
 </head>
 
@@ -741,6 +791,13 @@
             <option value="30">×30 máximo</option>
           </select>
         </div>
+        <div class="ctrl-row" style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between; font-size: 10px; border-top: 1px solid var(--border); padding-top: 8px; width: 100%;">
+          <span style="font-family:'Orbitron', sans-serif; font-weight: 700; color: var(--gray); font-size: 9px; letter-spacing: 0.05em;">RUTA COQUIMATLÁN</span>
+          <label class="switch">
+            <input type="checkbox" id="coq-toggle" checked onchange="toggleCoqRoute(this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
       </div>
 
       <!-- Rutas -->
@@ -801,7 +858,7 @@
     // ═══════════════════════════════════════════════════════════
     // MAPA
     // ═══════════════════════════════════════════════════════════
-    const map = L.map('map', { center: [19.248, -103.726], zoom: 13, zoomControl: true, attributionControl: false });
+    const map = L.map('map', { center: [19.235, -103.755], zoom: 12, zoomControl: true, attributionControl: false });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
     map.on('mousemove', e => {
       document.getElementById('bottom-coords').textContent =
@@ -900,7 +957,7 @@
         waypoints: [
           [19.2720, -103.7210], [19.2650, -103.7180], [19.2580, -103.7150],
           [19.2510, -103.7120], [19.2440, -103.7110], [19.2370, -103.7130],
-          [19.2300, -103.1180], [19.2250, -103.7250], [19.2240, -103.7350],
+          [19.2300, -103.7180], [19.2250, -103.7250], [19.2240, -103.7350],
           [19.2290, -103.7440], [19.2400, -103.7460], [19.2540, -103.7380], [19.2650, -103.7290], [19.2720, -103.7210],
         ],
       },
@@ -991,6 +1048,15 @@
           [19.2200, -103.7310], [19.2200, -103.7400], [19.2200, -103.7490],
         ],
       },
+      {
+        id: 'RCoq', label: 'Ruta Colima-Coquimatlán', busCount: 3,
+        color: '#FF5722', speedKmh: 42,
+        waypoints: [
+          [19.2435, -103.7260], [19.2330, -103.7430], [19.2312, -103.7682],
+          [19.2119, -103.8032], [19.2013, -103.8106],
+          [19.2119, -103.8032], [19.2312, -103.7682], [19.2330, -103.7430], [19.2435, -103.7260]
+        ],
+      },
     ];
 
     // ═══════════════════════════════════════════════════════════
@@ -1020,6 +1086,8 @@
     const TX_INTERVAL = 30;  // segundos LoRaWAN entre transmisiones
     const TOA_MS = 60;        // ms en el aire (SF8, 12 bytes, US915)
     let totalDistKm = 0;
+    let lastDomUpdateT = 0;
+    let lastRouteListUpdateT = 0;
 
     // Pulsos animados en SVG
     let pulses = [];
@@ -1119,7 +1187,8 @@
     }
 
     function updateHeader() {
-      document.getElementById('hm-buses').textContent = buses.length;
+      const activeBuses = buses.filter(b => ROUTE_DEFS[b.routeIdx].active !== false);
+      document.getElementById('hm-buses').textContent = activeBuses.length;
       document.getElementById('hm-pkts').textContent = totalPkts;
       document.getElementById('hm-lost').textContent = lostPkts;
       const pdr = totalPkts > 0 ? ((totalPkts - lostPkts) / totalPkts * 100).toFixed(1) + '%' : '—';
@@ -1128,7 +1197,7 @@
       document.getElementById('sim-clock').textContent = 'Reloj de simulación: ' + simTimeStr(simT);
 
       // Ocupación del canal (simplificada)
-      const nBuses = buses.length;
+      const nBuses = activeBuses.length;
       const occMs = (nBuses * TOA_MS) / (TX_INTERVAL * 1000) * 100;
       document.getElementById('met-occ').textContent = occMs.toFixed(1) + '%';
       document.getElementById('met-dist').textContent = totalDistKm.toFixed(1) + ' km';
@@ -1142,7 +1211,9 @@
 
     function updateRouteList() {
       const el = document.getElementById('route-list');
-      el.innerHTML = ROUTE_DEFS.map((r, i) => {
+      const activeRoutes = ROUTE_DEFS.filter(r => r.active !== false);
+      el.innerHTML = activeRoutes.map((r) => {
+        const i = ROUTE_DEFS.indexOf(r);
         const busesDef = buses.filter(b => b.routeIdx === i);
         const ll = busesDef.length > 0 ? busLatLng(busesDef[0]) : null;
         const gwId = ll ? GWS[nearestGW(ll[0], ll[1]).idx].id : '—';
@@ -1157,7 +1228,7 @@
       </div>
     `;
       }).join('');
-      document.getElementById('route-count').textContent = ROUTE_DEFS.length;
+      document.getElementById('route-count').textContent = activeRoutes.length;
     }
 
     function flyToRoute(idx) {
@@ -1184,6 +1255,8 @@
 
         buses.forEach(bus => {
           const def = ROUTE_DEFS[bus.routeIdx];
+          if (def.active === false) return; // Omitir simulación para rutas desactivadas
+
           const coords = routeData[bus.routeIdx];
           if (!coords || coords.length < 2) return;
 
@@ -1240,8 +1313,15 @@
         pulses.forEach(p => { p.progress += wallDt * 1.2; });
         pulses = pulses.filter(p => p.progress < 1);
 
-        updateHeader();
-        updateRouteList();
+        // Optimización: Reducir actualizaciones del DOM para evitar sobrecarga de CPU (Reflow/Layout)
+        if (simT - lastDomUpdateT >= 0.2) {
+          updateHeader();
+          lastDomUpdateT = simT;
+        }
+        if (simT - lastRouteListUpdateT >= 1.0) {
+          updateRouteList();
+          lastRouteListUpdateT = simT;
+        }
       }
 
       drawPulses();
@@ -1272,9 +1352,10 @@
         const lenKm = lenM / 1000;
 
         // Dibujar ruta
-        L.polyline(coords, { color: def.color, weight: 2.5, opacity: 0.65, lineJoin: 'round' })
+        const polylineLayer = L.polyline(coords, { color: def.color, weight: 2.5, opacity: 0.65, lineJoin: 'round' })
           .addTo(map)
           .bindTooltip(`${def.label} · ${def.speedKmh} km/h · ${lenKm.toFixed(1)} km`, { sticky: true });
+        def.polylineLayer = polylineLayer;
 
         // Crear camiones
         for (let b = 0; b < def.busCount; b++) {
@@ -1345,6 +1426,7 @@
 
     function resetSim() {
       simT = 0; totalPkts = 0; lostPkts = 0; totalDistKm = 0;
+      lastDomUpdateT = 0; lastRouteListUpdateT = 0;
       pulses = []; logEntries = [];
       GWS.forEach(gw => gwPkts[gw.id] = 0);
       buses.forEach((b, i) => {
@@ -1356,6 +1438,45 @@
     }
 
     function setSpeed(v) { speed = parseFloat(v); }
+
+    function toggleCoqRoute(enabled) {
+      const def = ROUTE_DEFS.find(r => r.id === 'RCoq');
+      if (!def) return;
+
+      def.active = enabled;
+
+      // Mostrar/ocultar línea de ruta en el mapa
+      if (def.polylineLayer) {
+        if (enabled) {
+          def.polylineLayer.addTo(map);
+        } else {
+          map.removeLayer(def.polylineLayer);
+        }
+      }
+
+      // Mostrar/ocultar marcadores de autobuses
+      buses.forEach(bus => {
+        if (bus.routeIdx === ROUTE_DEFS.indexOf(def)) {
+          const marker = busMarkers[bus.uid];
+          if (marker) {
+            if (enabled) {
+              marker.addTo(map);
+            } else {
+              map.removeLayer(marker);
+            }
+          }
+        }
+      });
+
+      // Limpiar pulsos pendientes de la ruta desactivada
+      if (!enabled) {
+        pulses = pulses.filter(p => p.color !== def.color);
+      }
+
+      // Actualizar DOM de inmediato
+      updateHeader();
+      updateRouteList();
+    }
 
     map.on('move zoom', drawPulses);
   </script>
