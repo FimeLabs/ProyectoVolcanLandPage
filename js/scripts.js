@@ -257,7 +257,7 @@ function initMouseSpotlight() {
     }, { passive: true });
 }
 
-<!-- ── SCRIPT del contador (agregar al final de <body> o en js/scripts.js) ── -->
+// ── SCRIPT del contador (agregar al final de <body> o en js/scripts.js) ──
  (function () {
     'use strict';
 
