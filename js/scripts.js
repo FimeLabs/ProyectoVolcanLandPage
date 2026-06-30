@@ -256,3 +256,52 @@ function initMouseSpotlight() {
         document.documentElement.style.setProperty('--mouse-y', `${e.clientY}px`);
     }, { passive: true });
 }
+
+<!-- ── SCRIPT del contador (agregar al final de <body> o en js/scripts.js) ── -->
+ (function () {
+    'use strict';
+
+    // ── Clave de almacenamiento en localStorage ──────────────────────────────
+    var STORAGE_KEY = 'volcan_visit_count';
+
+    // ── Elemento del DOM ─────────────────────────────────────────────────────
+    var el = document.getElementById('visitCount');
+    if (!el) return;
+
+    // ── Leer el contador actual ───────────────────────────────────────────────
+    var count = parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10);
+
+    // ── Incrementar en 1 por cada carga de página ────────────────────────────
+    count += 1;
+    localStorage.setItem(STORAGE_KEY, count);
+
+    // ── Formatear con separadores de miles (ej. 1,234) ───────────────────────
+    function formatNumber(n) {
+      return n.toLocaleString('es-MX');
+    }
+
+    // ── Animación de conteo ascendente ───────────────────────────────────────
+    function animateCount(target) {
+      var start = Math.max(0, target - 30);   // arranca 30 unidades antes
+      var current = start;
+      var step = Math.ceil((target - start) / 20); // 20 pasos
+      var interval = setInterval(function () {
+        current = Math.min(current + step, target);
+        el.textContent = formatNumber(current);
+        if (current >= target) {
+          clearInterval(interval);
+          el.textContent = formatNumber(target);
+        }
+      }, 40); // ~40 ms por paso → animación de ~800 ms
+    }
+
+    // ── Mostrar con pequeño retraso para que la página cargue primero ─────────
+    setTimeout(function () {
+      el.classList.add('updating');
+      setTimeout(function () {
+        el.classList.remove('updating');
+        animateCount(count);
+      }, 300);
+    }, 600);
+
+  })();
