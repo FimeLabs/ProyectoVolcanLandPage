@@ -261,19 +261,9 @@ function initMouseSpotlight() {
  (function () {
     'use strict';
 
-    // ── Clave de almacenamiento en localStorage ──────────────────────────────
-    var STORAGE_KEY = 'volcan_visit_count';
-
     // ── Elemento del DOM ─────────────────────────────────────────────────────
     var el = document.getElementById('visitCount');
     if (!el) return;
-
-    // ── Leer el contador actual ───────────────────────────────────────────────
-    var count = parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10);
-
-    // ── Incrementar en 1 por cada carga de página ────────────────────────────
-    count += 1;
-    localStorage.setItem(STORAGE_KEY, count);
 
     // ── Formatear con separadores de miles (ej. 1,234) ───────────────────────
     function formatNumber(n) {
@@ -295,13 +285,44 @@ function initMouseSpotlight() {
       }, 40); // ~40 ms por paso → animación de ~800 ms
     }
 
-    // ── Mostrar con pequeño retraso para que la página cargue primero ─────────
-    setTimeout(function () {
+    // ── Obtener visitas desde la API global, con fallback a localStorage ─────
+    var API_KEY = 'proyecto-volcan-colima-visit-counter';
+    var API_URL = 'https://countapi.mileshilliard.com/api/v1/hit/' + API_KEY;
+    var LOCAL_KEY = 'volcan_visit_count_fallback';
+
+    function getCountAndAnimate() {
+      fetch(API_URL)
+        .then(function(res) {
+          if (!res.ok) throw new Error('Error en API');
+          return res.json();
+        })
+        .then(function(data) {
+          var count = data.value;
+          // Guardar también en local por si falla después
+          localStorage.setItem(LOCAL_KEY, count);
+          triggerAnimation(count);
+        })
+        .catch(function(err) {
+          console.warn('Fallo al obtener visitas de la API, usando local:', err);
+          // Fallback a localStorage
+          var localCount = parseInt(localStorage.getItem(LOCAL_KEY) || '0', 10);
+          localCount += 1;
+          localStorage.setItem(LOCAL_KEY, localCount);
+          triggerAnimation(localCount);
+        });
+    }
+
+    function triggerAnimation(count) {
       el.classList.add('updating');
       setTimeout(function () {
         el.classList.remove('updating');
         animateCount(count);
       }, 300);
+    }
+
+    // ── Mostrar con pequeño retraso para que la página cargue primero ─────────
+    setTimeout(function () {
+      getCountAndAnimate();
     }, 600);
 
   })();
