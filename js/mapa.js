@@ -184,11 +184,12 @@
         ],
       },
       {
-        id: 'R29', label: 'Ruta 29', busCount: 2,
+        id: 'R29', label: 'Ruta 29 (Libramiento)', busCount: 2,
         color: '#FF4C6A', speedKmh: 38,
         waypoints: [
-          [19.2200, -103.7050], [19.2200, -103.7130], [19.2200, -103.7220],
-          [19.2200, -103.7310], [19.2200, -103.7400], [19.2200, -103.7490],
+          [19.2330, -103.7430], [19.2200, -103.7290], [19.2220, -103.7120],
+          [19.2350, -103.7010], [19.2480, -103.7050],
+          [19.2350, -103.7010], [19.2220, -103.7120], [19.2200, -103.7290], [19.2330, -103.7430]
         ],
       },
       {
@@ -198,6 +199,24 @@
           [19.2435, -103.7260], [19.2330, -103.7430], [19.2312, -103.7682],
           [19.2119, -103.8032], [19.2013, -103.8106],
           [19.2119, -103.8032], [19.2312, -103.7682], [19.2330, -103.7430], [19.2435, -103.7260]
+        ],
+      },
+      {
+        id: 'RBuena', label: 'Ruta Colima-Buenavista', busCount: 2,
+        color: '#8A2BE2', speedKmh: 40,
+        waypoints: [
+          [19.2435, -103.7260], [19.2480, -103.7050], [19.2480, -103.6800],
+          [19.2483, -103.6500], [19.2486, -103.6152],
+          [19.2483, -103.6500], [19.2480, -103.6800], [19.2480, -103.7050], [19.2435, -103.7260]
+        ],
+      },
+      {
+        id: 'RTrap', label: 'Ruta Colima-El Trapiche', busCount: 2,
+        color: '#FF1493', speedKmh: 45,
+        waypoints: [
+          [19.2435, -103.7260], [19.2720, -103.7210], [19.2750, -103.6900],
+          [19.2782, -103.6615],
+          [19.2750, -103.6900], [19.2720, -103.7210], [19.2435, -103.7260]
         ],
       },
     ];
@@ -582,39 +601,42 @@
 
     function setSpeed(v) { speed = parseFloat(v); }
 
-    function toggleCoqRoute(enabled) {
-      const def = ROUTE_DEFS.find(r => r.id === 'RCoq');
-      if (!def) return;
+    function toggleForaneas(enabled) {
+      const targetIds = ['RCoq', 'RBuena', 'RTrap'];
+      targetIds.forEach(id => {
+        const def = ROUTE_DEFS.find(r => r.id === id);
+        if (!def) return;
 
-      def.active = enabled;
+        def.active = enabled;
 
-      // Mostrar/ocultar línea de ruta en el mapa
-      if (def.polylineLayer) {
-        if (enabled) {
-          def.polylineLayer.addTo(map);
-        } else {
-          map.removeLayer(def.polylineLayer);
-        }
-      }
-
-      // Mostrar/ocultar marcadores de autobuses
-      buses.forEach(bus => {
-        if (bus.routeIdx === ROUTE_DEFS.indexOf(def)) {
-          const marker = busMarkers[bus.uid];
-          if (marker) {
-            if (enabled) {
-              marker.addTo(map);
-            } else {
-              map.removeLayer(marker);
-            }
+        // Mostrar/ocultar línea de ruta en el mapa
+        if (def.polylineLayer) {
+          if (enabled) {
+            def.polylineLayer.addTo(map);
+          } else {
+            map.removeLayer(def.polylineLayer);
           }
         }
-      });
 
-      // Limpiar pulsos pendientes de la ruta desactivada
-      if (!enabled) {
-        pulses = pulses.filter(p => p.color !== def.color);
-      }
+        // Mostrar/ocultar marcadores de autobuses
+        buses.forEach(bus => {
+          if (bus.routeIdx === ROUTE_DEFS.indexOf(def)) {
+            const marker = busMarkers[bus.uid];
+            if (marker) {
+              if (enabled) {
+                marker.addTo(map);
+              } else {
+                map.removeLayer(marker);
+              }
+            }
+          }
+        });
+
+        // Limpiar pulsos de la ruta desactivada
+        if (!enabled) {
+          pulses = pulses.filter(p => p.color !== def.color);
+        }
+      });
 
       // Actualizar DOM de inmediato
       updateHeader();
